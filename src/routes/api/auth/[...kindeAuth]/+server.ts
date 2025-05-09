@@ -3,13 +3,13 @@ import type { RequestEvent } from "@sveltejs/kit";
 import { createKindeStorage } from '$lib/kindeCloudflareStorage';
 
 // These MUST be defined in your environment variables
-const ISSUER_URL = process.env.KINDE_ISSUER_URL || '';
-const CLIENT_ID = process.env.KINDE_CLIENT_ID || '';
-const CLIENT_SECRET = process.env.KINDE_CLIENT_SECRET || '';
-const REDIRECT_URL = process.env.KINDE_REDIRECT_URL || '';
-const POST_LOGIN_REDIRECT_URL = process.env.KINDE_POST_LOGIN_REDIRECT_URL || '/dashboard';
-const POST_LOGOUT_REDIRECT_URL = process.env.KINDE_POST_LOGOUT_REDIRECT_URL || '/';
-const SCOPE = process.env.KINDE_SCOPE || 'openid profile email offline';
+const ISSUER_URL = context.env.KINDE_ISSUER_URL || '';
+const CLIENT_ID = context.env.KINDE_CLIENT_ID || '';
+const CLIENT_SECRET = context.env.KINDE_CLIENT_SECRET || '';
+const REDIRECT_URL = context.env.KINDE_REDIRECT_URL || '';
+const POST_LOGIN_REDIRECT_URL = context.env.KINDE_POST_LOGIN_REDIRECT_URL || '/dashboard';
+const POST_LOGOUT_REDIRECT_URL = context.env.KINDE_POST_LOGOUT_REDIRECT_URL || '/';
+const SCOPE = context.env.KINDE_SCOPE || 'openid profile email offline';
 
 export async function GET(event: RequestEvent) {
   const storage = createKindeStorage(event);
