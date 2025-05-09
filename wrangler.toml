@@ -15,3 +15,4 @@ KINDE_REDIRECT_URL = "https://sveltekit-doc-test.pages.dev/api/auth/kinde_callba
 KINDE_POST_LOGOUT_REDIRECT_URL = "https://sveltekit-doc-test.pages.dev"
 KINDE_POST_LOGIN_REDIRECT_URL = "https://sveltekit-doc-test.pages.dev/dashboard"
 KINDE_AUTH_WITH_PKCE = "true"
+KINDE_SCOPE = 'openid profile email offline'
