@@ -2,16 +2,20 @@ import { json, redirect } from '@sveltejs/kit';
 import type { RequestEvent } from "@sveltejs/kit";
 import { createKindeStorage } from '$lib/kindeCloudflareStorage';
 
-// These MUST be defined in your environment variables
-const ISSUER_URL = context.env.KINDE_ISSUER_URL || '';
-const CLIENT_ID = context.env.KINDE_CLIENT_ID || '';
-const CLIENT_SECRET = context.env.KINDE_CLIENT_SECRET || '';
-const REDIRECT_URL = context.env.KINDE_REDIRECT_URL || '';
-const POST_LOGIN_REDIRECT_URL = context.env.KINDE_POST_LOGIN_REDIRECT_URL || '/dashboard';
-const POST_LOGOUT_REDIRECT_URL = context.env.KINDE_POST_LOGOUT_REDIRECT_URL || '/';
-const SCOPE = context.env.KINDE_SCOPE || 'openid profile email offline';
-
 export async function GET(event: RequestEvent) {
+  // Access environment variables through platform.env
+  const platform = event.platform as any;
+  const env = platform?.env || {};
+  
+  // These MUST be defined in your environment variables
+  const ISSUER_URL = env.KINDE_ISSUER_URL || '';
+  const CLIENT_ID = env.KINDE_CLIENT_ID || '';
+  const CLIENT_SECRET = env.KINDE_CLIENT_SECRET || '';
+  const REDIRECT_URL = env.KINDE_REDIRECT_URL || '';
+  const POST_LOGIN_REDIRECT_URL = env.KINDE_POST_LOGIN_REDIRECT_URL || '/dashboard';
+  const POST_LOGOUT_REDIRECT_URL = env.KINDE_POST_LOGOUT_REDIRECT_URL || '/';
+  const SCOPE = env.KINDE_SCOPE || 'openid profile email offline';
+
   const storage = createKindeStorage(event);
   const url = new URL(event.request.url);
   const path = url.pathname.split('/').pop() || '';
@@ -24,11 +28,13 @@ export async function GET(event: RequestEvent) {
   // Handle various auth endpoints
   switch (path) {
     case 'login':
-      return handleLogin(event, storage);
+      return handleLogin(ISSUER_URL, CLIENT_ID, REDIRECT_URL, SCOPE, 
+                        POST_LOGIN_REDIRECT_URL, event, storage);
     case 'kinde_callback':
-      return handleCallback(event, storage);
+      return handleCallback(ISSUER_URL, CLIENT_ID, CLIENT_SECRET, 
+                          REDIRECT_URL, POST_LOGIN_REDIRECT_URL, event, storage);
     case 'logout':
-      return handleLogout(event, storage);
+      return handleLogout(ISSUER_URL, POST_LOGOUT_REDIRECT_URL, event, storage);
     default:
       return json({ error: 'Unknown auth endpoint' }, { status: 404 });
   }
@@ -45,9 +51,17 @@ function generateRandomString(length = 32) {
 }
 
 // Handle login request
-async function handleLogin(event: RequestEvent, storage: any) {
+async function handleLogin(
+  issuerUrl: string,
+  clientId: string,
+  redirectUrl: string,
+  scope: string,
+  postLoginUrl: string,
+  event: RequestEvent,
+  storage: any
+) {
   // Validate required environment variables
-  if (!ISSUER_URL || !CLIENT_ID || !REDIRECT_URL) {
+  if (!issuerUrl || !clientId || !redirectUrl) {
     console.error('Missing required environment variables');
     return json({ error: 'Missing configuration' }, { status: 500 });
   }
@@ -57,15 +71,15 @@ async function handleLogin(event: RequestEvent, storage: any) {
   await storage.setState(state, 'true');
   
   // Store redirect URL
-  await storage.setState(`redirect:${state}`, POST_LOGIN_REDIRECT_URL);
+  await storage.setState(`redirect:${state}`, postLoginUrl);
   
   try {
     // Build authorization URL - ensure ISSUER_URL is valid
-    const authUrl = new URL('/oauth2/auth', ISSUER_URL);
-    authUrl.searchParams.append('client_id', CLIENT_ID);
-    authUrl.searchParams.append('redirect_uri', REDIRECT_URL);
+    const authUrl = new URL('/oauth2/auth', issuerUrl);
+    authUrl.searchParams.append('client_id', clientId);
+    authUrl.searchParams.append('redirect_uri', redirectUrl);
     authUrl.searchParams.append('response_type', 'code');
-    authUrl.searchParams.append('scope', SCOPE);
+    authUrl.searchParams.append('scope', scope);
     authUrl.searchParams.append('state', state);
     
     console.log(`Redirecting to Kinde auth: ${authUrl.toString()}`);
@@ -77,7 +91,15 @@ async function handleLogin(event: RequestEvent, storage: any) {
 }
 
 // Handle OAuth callback
-async function handleCallback(event: RequestEvent, storage: any) {
+async function handleCallback(
+  issuerUrl: string,
+  clientId: string,
+  clientSecret: string,
+  redirectUrl: string,
+  postLoginUrl: string,
+  event: RequestEvent,
+  storage: any
+) {
   const url = new URL(event.request.url);
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
@@ -103,7 +125,7 @@ async function handleCallback(event: RequestEvent, storage: any) {
   }
   
   // Get post-login redirect URL
-  const redirectUrl = await storage.getState(`redirect:${state}`) || POST_LOGIN_REDIRECT_URL;
+  const redirectTo = await storage.getState(`redirect:${state}`) || postLoginUrl;
   
   // Clean up stored state
   await storage.deleteState(state);
@@ -111,17 +133,17 @@ async function handleCallback(event: RequestEvent, storage: any) {
   
   try {
     // Exchange code for tokens
-    if (!ISSUER_URL || !CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URL) {
+    if (!issuerUrl || !clientId || !clientSecret || !redirectUrl) {
       throw new Error('Missing required environment variables');
     }
     
-    const tokenUrl = new URL('/oauth2/token', ISSUER_URL);
+    const tokenUrl = new URL('/oauth2/token', issuerUrl);
     const params = new URLSearchParams();
     params.append('grant_type', 'authorization_code');
     params.append('code', code);
-    params.append('redirect_uri', REDIRECT_URL);
-    params.append('client_id', CLIENT_ID);
-    params.append('client_secret', CLIENT_SECRET);
+    params.append('redirect_uri', redirectUrl);
+    params.append('client_id', clientId);
+    params.append('client_secret', clientSecret);
     
     const response = await fetch(tokenUrl.toString(), {
       method: 'POST',
@@ -159,7 +181,7 @@ async function handleCallback(event: RequestEvent, storage: any) {
     return new Response(null, {
       status: 302,
       headers: {
-        'Location': redirectUrl,
+        'Location': redirectTo,
         'Cache-Control': 'no-store'
       }
     });
@@ -170,23 +192,28 @@ async function handleCallback(event: RequestEvent, storage: any) {
 }
 
 // Handle logout
-async function handleLogout(event: RequestEvent, storage: any) {
+async function handleLogout(
+  issuerUrl: string,
+  postLogoutUrl: string,
+  event: RequestEvent,
+  storage: any
+) {
   // Clear tokens
   await storage.deleteState('tokens');
   console.log('Tokens deleted during logout');
   
   try {
     // Redirect to Kinde logout
-    if (!ISSUER_URL) {
+    if (!issuerUrl) {
       throw new Error('Missing ISSUER_URL environment variable');
     }
     
-    const logoutUrl = new URL('/logout', ISSUER_URL);
-    logoutUrl.searchParams.append('redirect', POST_LOGOUT_REDIRECT_URL);
+    const logoutUrl = new URL('/logout', issuerUrl);
+    logoutUrl.searchParams.append('redirect', postLogoutUrl);
     
     return redirect(302, logoutUrl.toString());
   } catch (error) {
     console.error('Logout error:', error);
-    return redirect(302, POST_LOGOUT_REDIRECT_URL);
+    return redirect(302, postLogoutUrl);
   }
 }
