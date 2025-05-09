@@ -1,0 +1,17 @@
+name = "sveltekit-docs-test"
+compatibility_date = "2023-06-28"
+compatibility_flags = ["nodejs_compat_v2"]
+pages_build_output_dir = "./svelte-kit/cloudflare"
+
+kv_namespaces = [
+  { binding = "AUTH_STORAGE", id = "09d660bda1a64539a745578e20a69091" }
+]
+
+[vars]
+KINDE_ISSUER_URL = "https://your-kinde-domain.kinde.com"
+KINDE_CLIENT_ID = "53add5e70e57400eb752ddb02bc07fb6"
+KINDE_CLIENT_SECRET = "W0PV642CRqIptpSAvtZB6euWf2tgxQhKYJUFzYZKo4Z8oGm8wW"
+KINDE_REDIRECT_URL = "https://your-domain.pages.dev/api/auth/kinde_callback"
+KINDE_POST_LOGOUT_REDIRECT_URL = "https://your-domain.pages.dev"
+KINDE_POST_LOGIN_REDIRECT_URL = "https://your-domain.pages.dev/dashboard"
+KINDE_AUTH_WITH_PKCE = "true"
